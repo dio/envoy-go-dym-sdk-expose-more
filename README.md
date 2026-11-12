@@ -67,8 +67,8 @@ repeated request header in two response headers.
 
 ### 2. Reusing a native filter library from a Go module
 
-A Go module can use an existing Rust or C library, such as a WAF, a scanner or
-a parser, and let it read headers, bodies or metadata of the same stream.
+A Go module can use an existing Rust or C library, such as a scanner or a
+parser, and let it read headers, bodies or metadata of the same stream.
 Without the pointer, every access goes back through Go with a copy, or the
 library has to be a separate Envoy filter with its own configuration.
 
