@@ -1,0 +1,4 @@
+/sdk-patched/
+*.so
+*.dylib
+*.test

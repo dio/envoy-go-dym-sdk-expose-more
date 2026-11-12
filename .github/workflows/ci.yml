@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  ENVOY_VERSION: v1.40.2
+  # SHA-256 of envoy-1.40.2-linux-x86_64, from the checksums.txt.asc that is
+  # published with the Envoy v1.40.2 release.
+  ENVOY_SHA256: 1d64506e25c1844f146162ddb2ece7010fa4e784faddb40a079021491f1f03cc
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Patch the SDK
+        run: go run ./cmd/patchsdk
+      - name: Unit test of the patched SDK
+        working-directory: sdk-patched/sdk/go/abi
+        env:
+          CGO_LDFLAGS: -Wl,--unresolved-symbols=ignore-all
+        run: go test -v .
+      - name: Vet
+        run: go vet ./...
+      - name: Download Envoy ${{ env.ENVOY_VERSION }}
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/envoy" \
+            "https://github.com/envoyproxy/envoy/releases/download/${ENVOY_VERSION}/envoy-${ENVOY_VERSION#v}-linux-x86_64"
+          echo "${ENVOY_SHA256}  $RUNNER_TEMP/envoy" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/envoy"
+          # The SDK pin b2d89e0ae539 must be the commit of this release.
+          "$RUNNER_TEMP/envoy" --version | tee /dev/stderr | grep -q b2d89e0ae539
+      - name: Envoy tests
+        env:
+          ENVOY_BIN: ${{ runner.temp }}/envoy
+        run: go test -count=1 -v ./examples/...
+
+  macos:
+    # Envoy publishes no macOS release binary, so this job builds and runs the
+    # unit test, and the Envoy tests skip.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Patch the SDK
+        run: go run ./cmd/patchsdk
+      - name: Unit test of the patched SDK
+        working-directory: sdk-patched/sdk/go/abi
+        run: go test -v .
+      - name: Vet
+        run: go vet ./...
+      - name: Build the examples library
+        run: go build -buildmode=c-shared -o "$RUNNER_TEMP/libexamples.dylib" ./examples
+      - name: Tests without Envoy
+        run: go test -count=1 -v ./examples/...
