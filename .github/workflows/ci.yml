@@ -9,10 +9,11 @@ permissions:
   contents: read
 
 env:
+  # Envoy builds come from tetratelabs/archive-envoy. The SHA-256 values are
+  # the ones in envoy-v1.40.2.json of that release.
   ENVOY_VERSION: v1.40.2
-  # SHA-256 of envoy-1.40.2-linux-x86_64, from the checksums.txt.asc that is
-  # published with the Envoy v1.40.2 release.
-  ENVOY_SHA256: 1d64506e25c1844f146162ddb2ece7010fa4e784faddb40a079021491f1f03cc
+  ENVOY_SHA256_LINUX_AMD64: 7490103caa169d5ab6c35a366813ea9e98196494a4fd17988e9d16af295eea98
+  ENVOY_SHA256_DARWIN_ARM64: 3ccd840a1f5ec924baa56561dee913783103db2d3198ebf61f9b224c8ca9bcc0
 
 jobs:
   linux:
@@ -31,22 +32,21 @@ jobs:
         run: go test -v .
       - name: Vet
         run: go vet ./...
-      - name: Download Envoy ${{ env.ENVOY_VERSION }}
+      - name: Install Envoy ${{ env.ENVOY_VERSION }}
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/envoy" \
-            "https://github.com/envoyproxy/envoy/releases/download/${ENVOY_VERSION}/envoy-${ENVOY_VERSION#v}-linux-x86_64"
-          echo "${ENVOY_SHA256}  $RUNNER_TEMP/envoy" | sha256sum -c -
-          chmod +x "$RUNNER_TEMP/envoy"
-          # The SDK pin b2d89e0ae539 must be the commit of this release.
-          "$RUNNER_TEMP/envoy" --version | tee /dev/stderr | grep -q b2d89e0ae539
+          name="envoy-${ENVOY_VERSION}-linux-amd64"
+          curl -fsSL -o "$RUNNER_TEMP/$name.tar.xz" \
+            "https://github.com/tetratelabs/archive-envoy/releases/download/${ENVOY_VERSION}/$name.tar.xz"
+          echo "${ENVOY_SHA256_LINUX_AMD64}  $RUNNER_TEMP/$name.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/$name.tar.xz" -C "$RUNNER_TEMP"
+          echo "ENVOY_BIN=$RUNNER_TEMP/$name/bin/envoy" >> "$GITHUB_ENV"
+      - name: Check the Envoy commit
+        # The SDK pin b2d89e0ae539 must be the commit of this Envoy.
+        run: '"$ENVOY_BIN" --version | tee /dev/stderr | grep -q b2d89e0ae539'
       - name: Envoy tests
-        env:
-          ENVOY_BIN: ${{ runner.temp }}/envoy
         run: go test -count=1 -v ./examples/...
 
   macos:
-    # Envoy publishes no macOS release binary, so this job builds and runs the
-    # unit test, and the Envoy tests skip.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,15 @@ jobs:
         run: go test -v .
       - name: Vet
         run: go vet ./...
-      - name: Build the examples library
-        run: go build -buildmode=c-shared -o "$RUNNER_TEMP/libexamples.dylib" ./examples
-      - name: Tests without Envoy
+      - name: Install Envoy ${{ env.ENVOY_VERSION }}
+        run: |
+          name="envoy-${ENVOY_VERSION}-darwin-arm64"
+          curl -fsSL -o "$RUNNER_TEMP/$name.tar.xz" \
+            "https://github.com/tetratelabs/archive-envoy/releases/download/${ENVOY_VERSION}/$name.tar.xz"
+          echo "${ENVOY_SHA256_DARWIN_ARM64}  $RUNNER_TEMP/$name.tar.xz" | shasum -a 256 -c -
+          tar -xJf "$RUNNER_TEMP/$name.tar.xz" -C "$RUNNER_TEMP"
+          echo "ENVOY_BIN=$RUNNER_TEMP/$name/bin/envoy" >> "$GITHUB_ENV"
+      - name: Check the Envoy commit
+        run: '"$ENVOY_BIN" --version | tee /dev/stderr | grep -q b2d89e0ae539'
+      - name: Envoy tests
         run: go test -count=1 -v ./examples/...

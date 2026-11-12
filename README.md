@@ -168,11 +168,12 @@ dynamic lookup already. The examples set the flag for themselves in their
 `#cgo` lines.
 
 The unit tests and the examples run on macOS and Linux with an Envoy binary of
-the same version. CI (`.github/workflows/ci.yml`) runs them on Linux x86_64 and macOS arm64
-with the v1.40.2 builds from
-[tetratelabs/archive-envoy](https://github.com/tetratelabs/archive-envoy),
-checked against the SHA-256 values published there. It also checks that `envoy --version` reports the commit b2d89e0ae539, which is
-the SDK pin, so the ABI matches.
+the same version. CI (`.github/workflows/ci.yml`) runs them on Linux x86_64 and
+macOS arm64 with the v1.40.2 builds from
+[tetratelabs/archive-envoy](https://github.com/tetratelabs/archive-envoy), checked
+against the SHA-256 values published there. It also checks that
+`envoy --version` reports the commit b2d89e0ae539, which is the SDK pin, so the ABI matches.
+
 ## License
 
 Apache-2.0, as Envoy.
